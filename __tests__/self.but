@@ -1,0 +1,55 @@
+__before__() {
+  echo "__before__" >"${___BEFORE_TEST}"
+  ___RAN_BEFORE_TEST=true
+}
+__after__() {
+  ___RAN_AFTER_TEST=true
+}
+__before_each__() {
+  echo "__before_each__" >"${___BEFORE_EACH_TEST}"
+  ___RAN_BEFORE_EACH_TEST=true
+}
+__after_each__() {
+  echo "__after_each__" >"${___AFTER_EACH_TEST}"
+  ___RAN_AFTER_EACH_TEST=true
+}
+test_should_pass() {
+  return 0
+}
+ntest_should_fail() {
+  return 1
+}
+test_should_have_non_empty_instance_name() {
+  if [[ -z "${BUT__INSTANCE_NAME}" ]]; then return 1; fi
+}
+test_should_have_exact_instance_name() {
+  if [[ "${BUT__INSTANCE_NAME}" != "but_tests" ]]; then return 1; fi
+}
+test_should_have_non_empty_tmp_file_environment_variables() {
+  if [[ -z "${___BEFORE_TEST:-""}" ]]; then return 1; fi
+  if [[ -z "${___AFTER_TEST:-""}" ]]; then return 1; fi
+  if [[ -z "${___TEST_TMP_FILE:-""}" ]]; then return 1; fi
+}
+test_should_have_run_before_each_hook() {
+  if [[ "${___RAN_BEFORE_EACH_TEST}" == true ]]; then return 0; fi
+  if [[ ! -r "${___BEFORE_EACH_TEST}" ]]; then return 1; fi
+  if [[ "$(cat "${___BEFORE_EACH_TEST}")" != "__before_each__" ]]; then return 1; fi
+}
+test_should_have_run_after_each_hook() {
+  if [[ "${___RAN_AFTER_EACH_TEST}" == true ]]; then return 0; fi
+  if [[ ! -r "${___AFTER_EACH_TEST}" ]]; then return 1; fi
+  if [[ "$(cat "${___AFTER_EACH_TEST}")" != "__after_each__" ]]; then return 1; fi
+}
+test_should_have_run_before_hook() {
+  if [[ "${___RAN_BEFORE_TEST}" == true ]]; then return 0; fi
+  if [[ ! -r "${___BEFORE_TEST}" ]]; then return 1; fi
+  if [[ "$(cat "${___BEFORE_TEST}")" != "__before__" ]]; then return 1; fi
+}
+test_should_have_not_run_after_hook() {
+  if [[ -n "${___RAN_AFTER_TEST:-""}" ]]; then return 1; fi
+  if [[ -z "${___AFTER_TEST}" ]]; then return 1; fi
+}
+test_should_have_env_vars() {
+  if [[ -z "${___TEST_ENV_VAR:-""}" ]]; then return 1; fi
+  if [[ "${___TEST_ENV_VAR}" != "but" ]]; then return 1; fi
+}

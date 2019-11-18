@@ -1,0 +1,14 @@
+{
+  "name": "but_tests",
+  "tmp": {
+    "___BEFORE_TEST": "/tmp/before.txt",
+    "___AFTER_TEST": "/tmp/after.txt",
+    "___BEFORE_EACH_TEST": "/tmp/before_each.txt",
+    "___AFTER_EACH_TEST": "/tmp/after_each.txt",
+    "___TEST_TMP_FILE": "/tmp/test_tmp.txt"
+  },
+  "env": {
+    "___TEST_ENV_VAR": "but"
+  },
+  "root": "."
+}

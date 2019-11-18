@@ -1,0 +1,23 @@
+{
+  "name": "@urzo/but",
+  "version": "1.0.0",
+  "description": "[b]ash [u]niversal [t]esting",
+  "license": "Apache-2.0",
+  "author": "urzo [https://github.com/urzo]",
+  "home": "https://github.com/urzo/but",
+  "bugs": "https://github.com/urzo/but/issues",
+  "repository": "urzo/but",
+  "scripts": {
+    "test": "cd __tests__; yes | ../bin/but.bash --tap",
+    "link": "yarn link"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "bin": {
+    "but": "./bin/but.bash"
+  },
+  "files": [
+    "bin/but.bash"
+  ]
+}
