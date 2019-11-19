@@ -86,6 +86,7 @@ The molecular unit of `but` is the suite. A suite is a bash script that is:
 - contains no shebang
 - has a file extension of `.but`
 - contains 1 or more tests
+
 In other words a `but` suite is just a file that contains functions that adhere to the conventions prescribed by `but`.
 
 #### example
