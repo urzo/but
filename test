@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+IFS=$'\r\n'
+
+main() {
+  if (
+    cd __tests__
+    export BUT__CONFIG_SRC="${PWD}"
+    yes | but
+  ); then return 1; fi
+  if (
+    cd __tests__
+    export BUT__CONFIG_DISABLE=true
+    export BUT__CONFIG_ROOT="${PWD}"
+    yes | but
+  ); then return 1; fi
+  return 0
+}
+main

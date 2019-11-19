@@ -17,7 +17,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -eou pipefail
 ####################################################################################
 # magic variables
 ####################################################################################
@@ -76,7 +75,8 @@ declare BUT__INSTANCE_NAME=""
 # configuration
 declare BUT__CONFIG_SRC="${BUT__CONFIG_SRC:-"${PWD}"}"
 declare BUT__CONFIG_OUTPUT="${BUT__CONFIG_OUTPUT:-"tap"}"
-declare BUT__CONFIG_ROOT=""
+declare BUT__CONFIG_ROOT="${BUT__CONFIG_SRC:-"${PWD}"}"
+declare BUT__CONFIG_DISABLE="${BUT__CONFIG_DISABLE:-false}"
 # private
 declare BUT__TMP_FILES=""
 declare BUT__LOCKFILE=""
@@ -89,16 +89,6 @@ declare BUT__TESTCACHE=""
 declare -r ERR_INVALID_CONFIG_SRC=3
 declare -r ERR_INVALID_CONFIG=4
 declare -r ERR_INVALID_SUITE=5
-####################################################################################
-# validate required environment variables
-####################################################################################
-if [[ -z "${BUT__CONFIG_SRC:-""}" ]] || [[ ! -d "${BUT__CONFIG_SRC:-""}" ]]; then
-  ::err <<EOF
-BUT__CONFIG_SRC environment variable MUST be set and MUST be a valid directory path
-or a .butrc MAY be present in the current directory.
-EOF
-  exit ${ERR_INVALID_CONFIG_SRC}
-fi
 ####################################################################################
 # process EXIT handler
 ####################################################################################
@@ -221,33 +211,50 @@ trap ::cleanup EXIT
 ####################################################################################
 ::source_config() {
   local config="${BUT__CONFIG_SRC}/.butrc"
-  if [[ ! -r "${config}" ]]; then
-    ::err ".butrc config not found in directory ${BUT__CONFIG_SRC}"
-    ::warn "make sure that the BUT__CONFIG_SRC points to a directory that contains a .butrc file"
-    exit ${ERR_INVALID_CONFIG_SRC}
+  local config_envs
+  if [[ "${BUT__CONFIG_DISABLE}" == false ]]; then
+    if [[ ! -r "${config}" ]]; then
+      ::err ".butrc config not found in directory ${BUT__CONFIG_SRC}"
+      ::warn "make sure that the BUT__CONFIG_SRC points to a directory that contains a .butrc file"
+      exit ${ERR_INVALID_CONFIG_SRC}
+    fi
+
+    local -a expected_keys=("name" "root")
+    ::info "validating configuration from ${config}"
+    for key in "${expected_keys[@]}"; do
+      # shellcheck disable=SC2086
+      if [[ -z "$(jq -r '.'${key}'?' "${config}")" ]]; then
+        ::err "${key} not found in ${config}"
+        exit ${ERR_INVALID_CONFIG}
+      fi
+    done
+    ::ok "configuration validated"
+
+    BUT__INSTANCE_NAME="$(jq -r .name "${config}")"
+
+    if [[ -n "$(jq -r '.tmp[]?' "${config}")" ]]; then
+      BUT__TMP_FILES=("$(jq -r '.tmp | to_entries[] | .value' "${config}")")
+      ::ok "tmp files registered"
+      ::debug "${BUT__TMP_FILES[*]}"
+    fi
+
+    BUT__TEST_ROOT="$(jq -r .root? "${config}")"
+  else
+    BUT__INSTANCE_NAME="but_tests"
+    BUT__TEST_ROOT="${BUT__CONFIG_ROOT}"
   fi
 
-  local -a expected_keys=("name" "root")
-  ::info "validating configuration from ${config}"
-  for key in "${expected_keys[@]}"; do
-    # shellcheck disable=SC2086
-    if [[ -z "$(jq -r '.'${key}'?' "${config}")" ]]; then
-      ::err "${key} not found in ${config}"
-      exit ${ERR_INVALID_CONFIG}
-    fi
-  done
-  ::ok "configuration validated"
-
-  ::info "reading configuration from ${config}"
-
-  BUT__INSTANCE_NAME="$(jq -r .name "${config}")"
   if [[ -z "${BUT__INSTANCE_NAME}" ]]; then
     ::err ".butrc must have a string 'name' identifier"
     exit ${ERR_INVALID_CONFIG}
   fi
 
-  ::ok "instance name set"
-  ::debug "${BUT__INSTANCE_NAME}"
+  if [[ -z "${BUT__TEST_ROOT}" ]] &&
+    [[ ! -d "${BUT__TEST_ROOT}" ]] &&
+    [[ ! -L "${BUT__TEST_ROOT}" ]]; then
+    ::err "A valid BUT__TEST_ROOT path must be set. either via environment variables or a .butrc"
+    exit ${ERR_INVALID_CONFIG}
+  fi
 
   local tmp_dir="/tmp/${BUT__INSTANCE_NAME}"
 
@@ -255,22 +262,6 @@ trap ::cleanup EXIT
   BUT__TESTCACHE="${tmp_dir}/tests"
   BUT__LOCKFILE="${tmp_dir}/but.lock"
   BUT__ENVFILE="${tmp_dir}/.env"
-
-  if [[ -n "$(jq -r '.tmp[]?' "${config}")" ]]; then
-    BUT__TMP_FILES=("$(jq -r '.tmp | to_entries[] | .value' "${config}")")
-    ::ok "tmp files registered"
-    ::debug "${BUT__TMP_FILES[*]}"
-  fi
-
-  BUT__TEST_ROOT="$(jq -r .root? "${config}")"
-  if [[ -z "${BUT__TEST_ROOT}" ]] &&
-    [[ ! -d "${BUT__TEST_ROOT}" ]] &&
-    [[ ! -L "${BUT__TEST_ROOT}" ]]; then
-    ::err ".butrc must have a 'root' key with a valid directory path"
-    exit ${ERR_INVALID_CONFIG}
-  fi
-  ::ok "test source set"
-  ::debug "${BUT__TEST_ROOT}"
 
   ::info "checking for existing configuration"
   ::debug "${tmp_dir}"
@@ -297,27 +288,21 @@ trap ::cleanup EXIT
       mkdir -p "${BUT__TESTCACHE}"
     fi
 
-    ::info "extracting environment variables from configuration"
-    local config_envs
-    config_envs="$(
-      echo \
-        "$(jq -r '.tmp?' "${config}")" \
-        "$(jq -r '.env?' "${config}")" |
-        jq -s add
-    )"
-    ::ok "environment variables extracted"
-    ::debug "${config_envs}" "json"
-
-    ::info "writing test .env file to ${BUT__ENVFILE}"
-    echo "${config_envs}" | jq -r '. | keys[] as $key | $key+"="+"\""+(.[$key]|tostring)+"\""' >"${BUT__ENVFILE}"
-    ::ok ".env file written"
-    ::debug "${BUT__ENVFILE}" "file"
+    if [[ "${BUT__CONFIG_DISABLE}" == false  ]]; then
+      config_envs="$(
+        echo \
+          "$(jq -r '.tmp?' "${config}")" \
+          "$(jq -r '.env?' "${config}")" |
+          jq -s add
+      )"
+      echo "${config_envs}" | jq -r '. | keys[] as $key | $key+"="+"\""+(.[$key]|tostring)+"\""' >"${BUT__ENVFILE}"
+    fi
   fi
 
-  ::info "sourcing .env file"
-  # shellcheck disable=SC1090
-  set -a && source "${BUT__ENVFILE}" && set +a
-  ::ok ".env file sourced"
+  if [[ -r "${BUT__ENVFILE}" ]]; then
+    # shellcheck disable=SC1090
+    set -a && source "${BUT__ENVFILE}" && set +a
+  fi
 }
 ####################################################################################
 # test suite validation
@@ -541,7 +526,7 @@ EOF
     ::warn "test failed"
   fi
 
-  ::tap "${test_status}" "${test_index}" "${test_desc}"
+  ::tap "${test_status}" "$((test_index + 1))" "${test_desc}"
   if ::is_json; then echo '{
     "id": '"${test_index}"',
     "description": "'"${test_desc}"'",
@@ -557,7 +542,7 @@ EOF
 
   ::info "getting test suites from ${BUT__TEST_ROOT}"
   # shellcheck disable=SC2061
-  if [[ -z $(find "${BUT__TEST_ROOT}" -name *.but) ]]; then
+  if [[ -z $(find "${BUT__TEST_ROOT}" -name "*.but") ]]; then
     ::err "no test found at ${BUT__TEST_ROOT}"
     ::warn "tests must have the '.but' extension"
     exit 2
@@ -566,6 +551,7 @@ EOF
 
   ::info "validating and preparing test suites"
   for src in "${BUT__TEST_ROOT}"/*.but; do
+    local -i total_suite_tests=0
     ::validate_suite "${src}"
     ::info "preparing suite"
     ::prepare_suite "${src}"
@@ -574,7 +560,8 @@ EOF
     name="$(basename "${src%.but}")"
     local suite
     suite="$(jq -r . "${BUT__SUITECACHE}/${name}.json")"
-    total_tests=$(echo "${suite}" | jq -r '.total_tests')
+    total_suite_tests=$(echo "${suite}" | jq -r '.total_tests')
+    total_tests=$((total_tests + total_suite_tests))
     suites["${suite_index}"]="${suite}"
     suite_index=$((suite_index + 1))
   done
@@ -590,7 +577,8 @@ EOF
   ::ok "valid number of suites"
 
   ::info "running ${suite_index} suite(s)"
-  ::tap_start "${total_tests}"
+  # shellcheck disable=SC2086
+  ::tap_start ${total_tests}
 
   suite_index=0
   local -i test_index=0
@@ -661,7 +649,9 @@ EOF
 ####################################################################################
 but::exec() {
   ::info "running bash unit testing tool"
-  ::info "using config at ${BUT__CONFIG_SRC}"
+  if [[ "${BUT__CONFIG_DISABLE}" == false ]]; then
+    ::info "using config at ${BUT__CONFIG_SRC}"
+  fi
 
   ::info "preparing configuration"
   if ! ::source_config; then
