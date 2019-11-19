@@ -288,7 +288,7 @@ trap ::cleanup EXIT
       mkdir -p "${BUT__TESTCACHE}"
     fi
 
-    if [[ "${BUT__CONFIG_DISABLE}" == false  ]]; then
+    if [[ "${BUT__CONFIG_DISABLE}" == false ]]; then
       config_envs="$(
         echo \
           "$(jq -r '.tmp?' "${config}")" \
@@ -718,7 +718,7 @@ but::exec() {
     if [[ -r "${__root}/package.json" ]]; then
       jq -r '.version?' "${__root}/package.json"
     else
-      echo "unknown"
+      curl -sSL "https://raw.githubusercontent.com/urzo/but/master/package.json" | jq -r .version
     fi
     ;;
   --verbose)
