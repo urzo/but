@@ -54,10 +54,6 @@ yarn global add @urzo/but
 ```
 
 ## concepts
-`but` requires tests to be contained in a directory, and stipulates no naming requirements on this directory.
-It requires at least 1 file, a bash script with the `.but` extension, called the suite. That bash script must
-contain at least 1 bash function with the prefix `test`, e.g. `test_should_pass`. `but` uses the function name
-to generate a test description 
 
 ### test
 The atomic unit of `but` is the test. A test in `but` is a bash function that is prefixed with `test`.
