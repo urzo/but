@@ -1,0 +1,14 @@
+test_should_pass() {
+  return 0
+}
+ntest_should_fail() {
+  return 1
+}
+test_should_have_anonymous_instance_name() {
+  if [[ -z "${BUT__INSTANCE_NAME}" ]]; then return 1; fi
+  if [[ "${BUT__INSTANCE_NAME}" != "but_tests" ]]; then return 1; fi
+}
+test_should_have_environment_variable_from_dotenv_file() {
+  if [[ -z "${___TEST_ENVFILE_VAR:-""}" ]]; then return 1; fi
+  if [[ "${___TEST_ENVFILE_VAR:-""}" != "but" ]]; then return 1; fi
+}
